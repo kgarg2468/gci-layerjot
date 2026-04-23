@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, TypedDict
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
+from langgraph.graph import END, START, StateGraph
 
 from backend.config import settings
+from backend.prompts import ROUTER_SYSTEM_PROMPT, SYNTHESIS_SYSTEM_PROMPT
 from backend.safety import safety_check
 from backend.schemas import AIResponsePayload, ActionPayload, DebugPayload, fallback_payload
 from backend.tools import TOOL_REGISTRY
@@ -16,37 +18,13 @@ from backend.tools import TOOL_REGISTRY
 LOGGER = logging.getLogger(__name__)
 
 
-ROUTER_SYSTEM_PROMPT = """
-You are GCI, an AI clinical assistant for CLABSI prevention procedures.
-You are an execution engine, not a chatbot.
-
-Decide whether to call tools before answering.
-Use tools for real patient data and protocol data.
-""".strip()
-
-
-SYNTHESIS_SYSTEM_PROMPT = """
-You are GCI, an AI clinical assistant for CLABSI prevention procedures.
-
-Rules:
-1. Keep spoken_response concise (1-2 sentences).
-2. Never fabricate patient data. If patient data is needed, it must come from tool results.
-3. Never make diagnosis or medication dosing recommendations.
-4. If intent is unclear, return intent=clarify.
-5. Return only schema fields from AIResponsePayload.
-
-Allowed intents:
-- retrieve_data
-- navigate
-- rag
-- clarify
-- safety_block
-- error
-
-Action policy for this MVP:
-- Only open_screen action is supported.
-- If no action is needed, set action to null.
-""".strip()
+class AgentState(TypedDict, total=False):
+    transcript: str
+    context: dict
+    messages: List[BaseMessage]
+    tool_results: List[Dict[str, Any]]
+    safety_violation: Optional[str]
+    final_payload: Optional[AIResponsePayload]
 
 
 def _build_router_llm() -> ChatOpenAI:
@@ -67,8 +45,39 @@ def _build_synthesis_llm():
     return llm.with_structured_output(AIResponsePayload)
 
 
-async def _execute_tools(tool_calls: List[dict]) -> List[Dict[str, Any]]:
+async def _safety_node(state: AgentState) -> AgentState:
+    violation = safety_check(state["transcript"], state["context"])
+    if violation:
+        state["safety_violation"] = violation
+        state["final_payload"] = AIResponsePayload(
+            intent="safety_block",
+            spoken_response=violation,
+            action=None,
+        )
+    return state
+
+
+async def _router_node(state: AgentState) -> AgentState:
+    router_llm = _build_router_llm()
+    route_messages: List[BaseMessage] = [
+        SystemMessage(content=ROUTER_SYSTEM_PROMPT),
+        HumanMessage(
+            content=(
+                f"Transcript: {state['transcript']}\n"
+                f"Context JSON:\n{json.dumps(state['context'], indent=2)}"
+            )
+        ),
+    ]
+    ai_message = await router_llm.ainvoke(route_messages)
+    state["messages"] = route_messages + [ai_message]
+    return state
+
+
+async def _tool_executor_node(state: AgentState) -> AgentState:
+    last = state["messages"][-1]
+    tool_calls = list(getattr(last, "tool_calls", []) or [])
     results: List[Dict[str, Any]] = []
+    new_messages: List[BaseMessage] = []
 
     for tool_call in tool_calls:
         tool_name = tool_call.get("name")
@@ -91,8 +100,73 @@ async def _execute_tools(tool_calls: List[dict]) -> List[Dict[str, Any]]:
                 "result": tool_result,
             }
         )
+        new_messages.append(
+            ToolMessage(
+                content=json.dumps(tool_result),
+                tool_call_id=tool_call.get("id", tool_name),
+                name=tool_name,
+            )
+        )
 
-    return results
+    state["messages"] = state["messages"] + new_messages
+    state["tool_results"] = results
+    return state
+
+
+async def _synthesis_node(state: AgentState) -> AgentState:
+    synthesis_llm = _build_synthesis_llm()
+    tool_results = state.get("tool_results", [])
+    synthesis_messages: List[BaseMessage] = [
+        SystemMessage(content=SYNTHESIS_SYSTEM_PROMPT),
+        HumanMessage(
+            content=(
+                f"Transcript: {state['transcript']}\n"
+                f"Context:\n{json.dumps(state['context'], indent=2)}\n\n"
+                f"Tool results (JSON):\n{json.dumps(tool_results, indent=2)}"
+            )
+        ),
+    ]
+    candidate_payload = await synthesis_llm.ainvoke(synthesis_messages)
+    state["final_payload"] = _enforce_output_guards(candidate_payload, tool_results)
+    return state
+
+
+def _route_after_safety(state: AgentState) -> str:
+    return END if state.get("safety_violation") else "router"
+
+
+def _route_after_router(state: AgentState) -> str:
+    last = state["messages"][-1]
+    tool_calls = list(getattr(last, "tool_calls", []) or [])
+    return "tool_executor" if tool_calls else "synthesis"
+
+
+def _build_graph():
+    graph = StateGraph(AgentState)
+    graph.add_node("safety_gate", _safety_node)
+    graph.add_node("router", _router_node)
+    graph.add_node("tool_executor", _tool_executor_node)
+    graph.add_node("synthesis", _synthesis_node)
+    graph.add_edge(START, "safety_gate")
+    graph.add_conditional_edges("safety_gate", _route_after_safety, {END: END, "router": "router"})
+    graph.add_conditional_edges(
+        "router",
+        _route_after_router,
+        {"tool_executor": "tool_executor", "synthesis": "synthesis"},
+    )
+    graph.add_edge("tool_executor", "synthesis")
+    graph.add_edge("synthesis", END)
+    return graph.compile()
+
+
+_GRAPH = None
+
+
+def _graph():
+    global _GRAPH
+    if _GRAPH is None:
+        _GRAPH = _build_graph()
+    return _GRAPH
 
 
 def _heuristic_fallback(transcript: str, context: dict) -> AIResponsePayload:
@@ -175,17 +249,23 @@ def _enforce_output_guards(
     if candidate.action and candidate.action.type != "open_screen":
         candidate.action = None
 
-    # If navigation intent but action is missing, derive from tool result when possible.
-    if candidate.intent == "navigate" and candidate.action is None:
-        for result in tool_results:
-            if result["name"] == "open_screen" and isinstance(result["result"], dict):
-                screen = result["result"].get("screen")
-                if screen:
-                    candidate.action = ActionPayload(
-                        type="open_screen",
-                        params={"screen": screen},
-                    )
-                    break
+    # Normalize navigation actions from the actual tool result when the model omits screen details.
+    if candidate.intent == "navigate":
+        needs_screen = (
+            candidate.action is None
+            or candidate.action.type != "open_screen"
+            or not candidate.action.params.get("screen")
+        )
+        if needs_screen:
+            for result in tool_results:
+                if result["name"] == "open_screen" and isinstance(result["result"], dict):
+                    screen = result["result"].get("screen")
+                    if screen:
+                        candidate.action = ActionPayload(
+                            type="open_screen",
+                            params={"screen": screen},
+                        )
+                        break
 
     return candidate
 
@@ -196,41 +276,23 @@ async def run_agent(transcript: str, context: dict) -> AIResponsePayload:
         return AIResponsePayload(intent="safety_block", spoken_response=violation, action=None)
 
     if not settings.openai_api_key:
+        LOGGER.warning("OPENAI_API_KEY not set — using heuristic fallback orchestrator.")
         payload = _heuristic_fallback(transcript, context)
         payload.debug = DebugPayload(tool_called=None, tool_calls=[], tool_inputs=[])
         return payload
 
     try:
-        router_llm = _build_router_llm()
-        synthesis_llm = _build_synthesis_llm()
-
-        route_messages = [
-            SystemMessage(content=ROUTER_SYSTEM_PROMPT),
-            HumanMessage(
-                content=(
-                    f"Transcript: {transcript}\n"
-                    f"Context JSON:\n{json.dumps(context, indent=2)}"
-                )
-            ),
-        ]
-
-        router_response = await router_llm.ainvoke(route_messages)
-        tool_calls = list(getattr(router_response, "tool_calls", []) or [])
-        tool_results = await _execute_tools(tool_calls)
-
-        synthesis_messages = [
-            SystemMessage(content=SYNTHESIS_SYSTEM_PROMPT),
-            HumanMessage(
-                content=(
-                    f"Transcript: {transcript}\n"
-                    f"Context:\n{json.dumps(context, indent=2)}\n\n"
-                    f"Tool results (JSON):\n{json.dumps(tool_results, indent=2)}"
-                )
-            ),
-        ]
-
-        candidate_payload = await synthesis_llm.ainvoke(synthesis_messages)
-        payload = _enforce_output_guards(candidate_payload, tool_results)
+        initial_state: AgentState = {
+            "transcript": transcript,
+            "context": context,
+            "messages": [],
+            "tool_results": [],
+            "safety_violation": None,
+            "final_payload": None,
+        }
+        final_state = await _graph().ainvoke(initial_state)
+        payload = final_state["final_payload"]
+        tool_results = final_state.get("tool_results") or []
 
         payload.debug = DebugPayload(
             tool_called=tool_results[0]["name"] if tool_results else None,
