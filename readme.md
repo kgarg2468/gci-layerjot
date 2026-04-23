@@ -4,6 +4,8 @@ This repository now includes a Mac-only two-process MVP:
 - `backend`: FastAPI WebSocket server + LangChain orchestrator + safety + tools + RAG
 - `mac_client`: terminal push-to-talk voice client with OpenAI STT + macOS TTS (`say`)
 
+Product references for coding agents live in [`docs/`](docs/), including the CLABSI AR glasses use cases and implementation checklist.
+
 ## 1) Setup
 
 ```bash
