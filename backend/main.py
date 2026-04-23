@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import json
 import logging
 from time import perf_counter
@@ -9,6 +10,7 @@ from pydantic import ValidationError
 
 from backend.config import settings
 from backend.orchestrator import run_agent
+from backend.rag.ingest import ingest_docs, is_ingested
 from backend.schemas import (
     AIRequestEnvelope,
     AIResponseEnvelope,
@@ -24,7 +26,24 @@ logging.basicConfig(
 )
 LOGGER = logging.getLogger("gci.backend")
 
-app = FastAPI(title="GCI Mac MVP Backend", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        if not settings.openai_api_key:
+            LOGGER.info("RAG ingest: skipped (no OPENAI_API_KEY set).")
+        elif is_ingested():
+            LOGGER.info("RAG ingest: skipped (chroma_db already populated).")
+        else:
+            LOGGER.info("RAG ingest: building vector store from backend/docs ...")
+            ingest_docs()
+            LOGGER.info("RAG ingest: built.")
+    except Exception:
+        LOGGER.exception("RAG ingest failed at startup — falling back to text search.")
+    yield
+
+
+app = FastAPI(title="GCI Mac MVP Backend", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/health")
@@ -132,11 +151,13 @@ async def websocket_endpoint(websocket: WebSocket):
         LOGGER.info("WebSocket client disconnected.")
     except Exception:
         LOGGER.exception("WebSocket server failure.")
+        fb = fallback_payload()
+        fb.debug = DebugPayload(latency_ms=0)
         fallback = AIResponseEnvelope(
             type="ai_response",
             session_id="unknown",
             timestamp=now_iso8601(),
-            payload=fallback_payload(),
+            payload=fb,
         )
         try:
             await websocket.send_text(fallback.model_dump_json())

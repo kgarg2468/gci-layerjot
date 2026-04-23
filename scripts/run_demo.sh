@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 export PYTHONPATH="$ROOT_DIR"
 
-uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
+"$ROOT_DIR/.venv/bin/python" -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
 BACKEND_PID=$!
 
 cleanup() {
@@ -17,4 +17,4 @@ cleanup() {
 trap cleanup EXIT
 
 sleep 1
-python3 -m mac_client.client
+"$ROOT_DIR/.venv/bin/python" -m mac_client.client

@@ -25,6 +25,13 @@ def _load_documents(docs_dir: Path):
     return documents
 
 
+def is_ingested() -> bool:
+    """True if the Chroma DB directory exists and contains its SQLite artifact."""
+    db_dir = Path(settings.chroma_db_path)
+    sqlite_file = db_dir / "chroma.sqlite3"
+    return db_dir.is_dir() and sqlite_file.exists()
+
+
 def ingest_docs() -> None:
     docs_dir = Path(settings.docs_path)
     docs_dir.mkdir(parents=True, exist_ok=True)

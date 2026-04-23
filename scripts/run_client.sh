@@ -5,4 +5,4 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 export PYTHONPATH="$ROOT_DIR"
-exec python3 -m mac_client.client
+exec "$ROOT_DIR/.venv/bin/python" -m mac_client.client
