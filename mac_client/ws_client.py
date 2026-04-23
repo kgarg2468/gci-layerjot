@@ -33,9 +33,6 @@ class BackendWSClient:
             await self._ws.close()
 
     async def send_ai_request(self, transcript: str, context: dict, session_id: str) -> Dict[str, Any]:
-        if self._ws is None:
-            await self.connect()
-
         envelope = {
             "type": "ai_request",
             "session_id": session_id,
@@ -46,12 +43,23 @@ class BackendWSClient:
             },
         }
 
-        await self._ws.send(json.dumps(envelope))
+        async def _attempt() -> Dict[str, Any]:
+            if self._ws is None:
+                await self.connect()
 
-        while True:
-            raw = await self._ws.recv()
-            message = json.loads(raw)
-            if message.get("type") == "ai_response":
-                return message
-            if message.get("type") == "error":
-                raise RuntimeError(message.get("payload", {}).get("message", "Unknown backend error"))
+            await self._ws.send(json.dumps(envelope))
+
+            while True:
+                raw = await self._ws.recv()
+                message = json.loads(raw)
+                if message.get("type") == "ai_response":
+                    return message
+                if message.get("type") == "error":
+                    raise RuntimeError(message.get("payload", {}).get("message", "Unknown backend error"))
+
+        try:
+            return await _attempt()
+        except websockets.ConnectionClosed:
+            self._ws = None
+            await self.connect()
+            return await _attempt()

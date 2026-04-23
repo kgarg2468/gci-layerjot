@@ -128,6 +128,10 @@ async def run() -> None:
 
             print(f"[INTENT] {intent}")
             print(f"[RESPONSE] {spoken}")
+            debug = payload.get("debug") or {}
+            latency = debug.get("latency_ms")
+            if latency is not None:
+                print(f"[LATENCY] {latency} ms")
             if action is not None:
                 print(f"[ACTION] {action}")
 
