@@ -16,6 +16,7 @@ from backend.tools import TOOL_REGISTRY
 
 
 LOGGER = logging.getLogger(__name__)
+PATIENT_DATA_TOOLS = {"get_patient_vitals", "query_patient_records"}
 
 
 class AgentState(TypedDict, total=False):
@@ -182,6 +183,54 @@ def _heuristic_fallback(transcript: str, context: dict) -> AIResponsePayload:
             ),
         )
 
+    if any(
+        keyword in lowered
+        for keyword in [
+            "all patients",
+            "patients in our care",
+            "patient list",
+            "what patient",
+            "who is in room",
+            "room ",
+            "central line",
+            "central lines",
+            "abnormal vitals",
+        ]
+    ):
+        tool_result = TOOL_REGISTRY["query_patient_records"].invoke({"query": transcript})
+        records = tool_result.get("records", [])
+        if not records:
+            return AIResponsePayload(
+                intent="retrieve_data",
+                spoken_response="I could not find matching patient records.",
+                action=None,
+            )
+
+        if "room" in lowered and len(records) == 1:
+            record = records[0]
+            return AIResponsePayload(
+                intent="retrieve_data",
+                spoken_response=(
+                    f"{record.get('name')}, patient {record.get('patient_id')}, "
+                    f"is in Room {record.get('room')}."
+                ),
+                action=None,
+            )
+
+        patient_summaries = [
+            f"{record.get('name')} ({record.get('patient_id')}) in Room {record.get('room')}"
+            for record in records
+        ]
+        return AIResponsePayload(
+            intent="retrieve_data",
+            spoken_response=(
+                f"I found {len(records)} matching patient record"
+                f"{'' if len(records) == 1 else 's'}: "
+                f"{'; '.join(patient_summaries)}."
+            ),
+            action=None,
+        )
+
     if any(keyword in lowered for keyword in ["heart rate", "vitals", "blood pressure"]):
         patient_id = context.get("patient_id")
         if not patient_id:
@@ -235,8 +284,8 @@ def _enforce_output_guards(
 ) -> AIResponsePayload:
     tool_names = [item["name"] for item in tool_results]
 
-    # Never allow retrieve_data unless vitals tool was actually called.
-    if candidate.intent == "retrieve_data" and "get_patient_vitals" not in tool_names:
+    # Never allow retrieve_data unless patient data was actually retrieved.
+    if candidate.intent == "retrieve_data" and not PATIENT_DATA_TOOLS.intersection(tool_names):
         return AIResponsePayload(
             intent="clarify",
             spoken_response=(

@@ -159,6 +159,57 @@ def test_graph_retrieve_returns_grounded_patient_data(monkeypatch):
     assert out.debug.tool_inputs == [{"patient_id": "PAT-123"}]
 
 
+def test_graph_retrieve_allows_general_patient_query_tool(monkeypatch):
+    _set_api_key(monkeypatch, "fake")
+    monkeypatch.setattr(
+        orchestrator,
+        "_build_router_llm",
+        lambda: _StubLLM(
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "query_patient_records",
+                        "args": {"query": "room 3A"},
+                        "id": "tool-2b",
+                    }
+                ],
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        orchestrator,
+        "_build_synthesis_llm",
+        lambda: _StubLLM(
+            AIResponsePayload(
+                intent="retrieve_data",
+                spoken_response="Maria Chen, PAT-125, is in Room 3A.",
+                action=None,
+            )
+        ),
+    )
+
+    out = asyncio.run(run_agent("what patient is in room 3A", {"patient_id": None}))
+
+    assert out.intent == "retrieve_data"
+    assert "Maria Chen" in out.spoken_response
+    assert out.debug is not None
+    assert out.debug.tool_calls == ["query_patient_records"]
+    assert out.debug.tool_inputs == [{"query": "room 3A"}]
+
+
+def test_graph_retrieve_without_patient_tool_is_guarded(monkeypatch):
+    candidate = AIResponsePayload(
+        intent="retrieve_data",
+        spoken_response="Maria Chen is in Room 3A.",
+        action=None,
+    )
+
+    out = orchestrator._enforce_output_guards(candidate, [])
+
+    assert out.intent == "clarify"
+
+
 def test_graph_rag_uses_protocol_tool(monkeypatch):
     _set_api_key(monkeypatch, "fake")
     monkeypatch.setattr(
@@ -210,3 +261,13 @@ def test_offline_fallback_is_deterministic_and_uses_expanded_seed_data(monkeypat
     assert "112" in first.spoken_response
     assert first.debug is not None
     assert first.debug.tool_calls == []
+
+
+def test_offline_fallback_answers_room_lookup(monkeypatch):
+    _set_api_key(monkeypatch, "")
+
+    out = asyncio.run(run_agent("what patient is in room 3A", {"patient_id": None}))
+
+    assert out.intent == "retrieve_data"
+    assert "Maria Chen" in out.spoken_response
+    assert "PAT-125" in out.spoken_response
