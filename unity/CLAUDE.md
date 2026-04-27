@@ -15,11 +15,16 @@ Note:  This is not a production ready application.  So, let's keep it simple as 
 
 ## MCP / Unity Server
 
-The MCP Unity server runs on **port 8090** and auto-starts when Unity is open. Claude Code connects through it to manipulate the Unity Editor directly. Config lives in `ProjectSettings/McpUnitySettings.json` and `.mcp.json`.
+The MCP Unity server runs on **port 8090** and auto-starts when Unity is open. Claude Code connects through it to manipulate the Unity Editor directly. Config lives in `ProjectSettings/McpUnitySettings.json` (this folder) and `../.mcp.json` (repo root).
 
 Before using any `mcp__unity__*` tools that write to the scene, make sure Unity Editor is open and the project is loaded.
 
-Currently permitted MCP operations are listed in `.claude/settings.local.json`. Expand that list as needed when adding write operations.
+Currently permitted MCP operations are listed in `.claude/settings.local.json` (per-developer, not committed). Expand that list as needed when adding write operations.
+
+### MCP server path
+
+`../.mcp.json` points at the MCP Unity server inside Unity's package cache:
+`unity/Library/PackageCache/com.gamelovers.mcp-unity@<hash>/Server~/build/index.js`. The hash (`d50c83a273d8` at time of writing) is content-derived from the package version, so it should match across machines on the same package — but `Library/` is regenerated when Unity opens the project, so first-time setup is: clone repo → open `unity/` in Unity Hub → wait for package import → start Claude Code. If the hash differs locally, update the path in `../.mcp.json`.
 
 ---
 
