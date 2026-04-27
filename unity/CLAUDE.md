@@ -8,7 +8,7 @@ Unity Android app for CLABSI prevention, targeting XREAL AR glasses.
 Chapman University Grand Challenges Initiative, in partnership with LayerJot.  
 Unity version: **6000.4.0f1** — Build target: **Android** (IL2CPP, C# 9.0) — Rendering: **URP**
 
-Full build guide: `Docs/CLABSI_AR_Build_Guide_v2.md` — read this before starting any phase.
+Full build guide: `../docs/product/CLABSI_AR_Build_Guide_v2.md` — read this before starting any phase.
 
 Note:  This is not a production ready application.  So, let's keep it simple as it's just a demonstration of what is possible.  
 ---
