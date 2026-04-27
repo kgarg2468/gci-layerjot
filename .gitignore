@@ -7,5 +7,6 @@ backend/chroma_db/
 .pytest_cache/
 .DS_Store
 
-# Claude Code harness temp dir
+# Claude Code: per-developer dirs (trust decisions, harness temp)
+.claude/
 .utmp/
