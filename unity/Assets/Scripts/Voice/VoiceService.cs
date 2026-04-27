@@ -98,37 +98,48 @@ namespace CLABSIApp
         private void Listen()
         {
             if (isListening) return;
-            try
+            if (mainActivity == null) return;
+
+            isListening = true;
+            mainActivity.Call("runOnUiThread", new AndroidJavaRunnable(() =>
             {
-                if (recognizer == null)
+                try
                 {
-                    AndroidJavaClass srClass = new AndroidJavaClass("android.speech.SpeechRecognizer");
-                    recognizer = srClass.CallStatic<AndroidJavaObject>("createSpeechRecognizer", mainActivity);
-                    recognizer.Call("setRecognitionListener", new RecognitionListenerProxy(this));
+                    if (recognizer == null)
+                    {
+                        AndroidJavaClass srClass = new AndroidJavaClass("android.speech.SpeechRecognizer");
+                        recognizer = srClass.CallStatic<AndroidJavaObject>("createSpeechRecognizer", mainActivity);
+                        recognizer.Call("setRecognitionListener", new RecognitionListenerProxy(this));
+                    }
+
+                    AndroidJavaObject intent = new AndroidJavaObject("android.content.Intent", "android.speech.action.RECOGNIZE_SPEECH");
+                    intent.Call<AndroidJavaObject>("putExtra", "android.speech.extra.LANGUAGE_MODEL", "free_form");
+                    intent.Call<AndroidJavaObject>("putExtra", "android.speech.extra.MAX_RESULTS", 1);
+
+                    recognizer.Call("startListening", intent);
+                    Debug.Log("[Voice] Listening...");
                 }
-
-                AndroidJavaObject intent = new AndroidJavaObject("android.content.Intent", "android.speech.action.RECOGNIZE_SPEECH");
-                intent.Call<AndroidJavaObject>("putExtra", "android.speech.extra.LANGUAGE_MODEL", "free_form");
-                intent.Call<AndroidJavaObject>("putExtra", "android.speech.extra.MAX_RESULTS", 1);
-
-                isListening = true;
-                recognizer.Call("startListening", intent);
-                Debug.Log("[Voice] Listening...");
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"[Voice] Listen failed: {ex.Message}");
-                isListening = false;
-            }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[Voice] Listen failed: {ex.Message}");
+                    isListening = false;
+                }
+            }));
         }
 
         private void OnDestroy()
         {
-            if (recognizer != null)
+            if (recognizer == null || mainActivity == null) return;
+            AndroidJavaObject toDestroy = recognizer;
+            recognizer = null;
+            try
             {
-                try { recognizer.Call("destroy"); recognizer.Dispose(); } catch { }
-                recognizer = null;
+                mainActivity.Call("runOnUiThread", new AndroidJavaRunnable(() =>
+                {
+                    try { toDestroy.Call("destroy"); toDestroy.Dispose(); } catch { }
+                }));
             }
+            catch { }
         }
 
         private class RecognitionListenerProxy : AndroidJavaProxy

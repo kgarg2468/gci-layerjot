@@ -39,12 +39,15 @@ namespace CLABSIApp
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (!isInitialized)
             {
+                Debug.Log($"[TTS] Queued (engine not ready): {text}");
                 pendingSpeech.Enqueue(text);
                 return;
             }
+            Debug.Log($"[TTS] Speaking: {text}");
             try
             {
-                ttsObject.Call<int>("speak", text, 0, (AndroidJavaObject)null, "clabsi-step");
+                int result = ttsObject.Call<int>("speak", text, 0, (AndroidJavaObject)null, "clabsi-step");
+                if (result != 0) Debug.LogError($"[TTS] speak() returned non-success code: {result}");
             }
             catch (System.Exception ex)
             {
@@ -91,7 +94,12 @@ namespace CLABSIApp
             {
                 AndroidJavaClass localeClass = new AndroidJavaClass("java.util.Locale");
                 AndroidJavaObject usLocale = localeClass.GetStatic<AndroidJavaObject>("US");
-                ttsObject.Call<int>("setLanguage", usLocale);
+                int langResult = ttsObject.Call<int>("setLanguage", usLocale);
+                Debug.Log($"[TTS] setLanguage(US) returned {langResult} (>=0 ok, -1 missing data, -2 not supported)");
+                if (langResult < 0)
+                {
+                    Debug.LogError($"[TTS] US English voice data unavailable (code {langResult}). Speech will not produce sound.");
+                }
                 isInitialized = true;
                 Debug.Log("[TTS] Android TTS initialized");
                 while (pendingSpeech.Count > 0) Speak(pendingSpeech.Dequeue());
