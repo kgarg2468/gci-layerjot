@@ -1,0 +1,36 @@
+{
+  "id": "maintenance",
+  "name": "Central Line Maintenance",
+  "steps": [
+    {
+      "id": 1,
+      "title": "Dressing Inspection",
+      "instruction": "Inspect existing dressing for integrity, soiling, or loosening. Note any redness, swelling, or discharge at insertion site."
+    },
+    {
+      "id": 2,
+      "title": "Hand Hygiene",
+      "instruction": "Perform hand hygiene with soap and water or alcohol-based rub for at least 20 seconds."
+    },
+    {
+      "id": 3,
+      "title": "Dressing Change",
+      "instruction": "Don sterile gloves. Remove old dressing. Clean site with chlorhexidine and allow to dry. Apply new sterile transparent dressing."
+    },
+    {
+      "id": 4,
+      "title": "Line Flush",
+      "instruction": "Flush each lumen with normal saline using push-pause technique. Apply positive pressure when disconnecting syringe."
+    },
+    {
+      "id": 5,
+      "title": "Site Inspection",
+      "instruction": "Confirm insertion site shows no signs of infection: no erythema, no warmth, no exudate, no tenderness."
+    },
+    {
+      "id": 6,
+      "title": "Maintenance Complete",
+      "instruction": "Document dressing change date, site condition, and clinician name. Schedule next dressing change per protocol."
+    }
+  ]
+}

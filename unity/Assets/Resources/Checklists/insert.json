@@ -1,0 +1,51 @@
+{
+  "id": "insert",
+  "name": "Central Line Insertion",
+  "steps": [
+    {
+      "id": 1,
+      "title": "Sterile Field Setup",
+      "instruction": "Open sterile kit onto a clean surface without touching the interior. Verify all required supplies are present."
+    },
+    {
+      "id": 2,
+      "title": "Hand Hygiene",
+      "instruction": "Perform hand hygiene with soap and water or alcohol-based rub for at least 20 seconds."
+    },
+    {
+      "id": 3,
+      "title": "Site Preparation",
+      "instruction": "Clean insertion site with chlorhexidine gluconate using back-and-forth scrubbing motion for 30 seconds. Allow to dry completely."
+    },
+    {
+      "id": 4,
+      "title": "Gloving",
+      "instruction": "Don sterile gloves using proper technique. Do not touch non-sterile surfaces after gloving."
+    },
+    {
+      "id": 5,
+      "title": "Draping",
+      "instruction": "Apply full-body sterile drape over patient, exposing only the insertion site. Confirm drape is secure."
+    },
+    {
+      "id": 6,
+      "title": "Catheter Placement",
+      "instruction": "Insert catheter using sterile technique. Confirm venous access via blood return before advancing."
+    },
+    {
+      "id": 7,
+      "title": "Line Confirmation",
+      "instruction": "Confirm line position. Flush all lumens with normal saline and verify patency."
+    },
+    {
+      "id": 8,
+      "title": "Dressing Application",
+      "instruction": "Apply sterile transparent dressing over insertion site. Ensure dressing is flat with no air gaps."
+    },
+    {
+      "id": 9,
+      "title": "Procedure Complete",
+      "instruction": "Document insertion site, date, time, and clinician. Discard sharps and dispose of waste per protocol."
+    }
+  ]
+}

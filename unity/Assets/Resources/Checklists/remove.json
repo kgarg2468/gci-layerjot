@@ -1,0 +1,41 @@
+{
+  "id": "remove",
+  "name": "Central Line Removal",
+  "steps": [
+    {
+      "id": 1,
+      "title": "Hand Hygiene",
+      "instruction": "Perform hand hygiene with soap and water or alcohol-based rub for at least 20 seconds."
+    },
+    {
+      "id": 2,
+      "title": "Clamp Line",
+      "instruction": "Clamp all lumens before removal to prevent air embolism. Confirm all infusions are discontinued."
+    },
+    {
+      "id": 3,
+      "title": "Remove Catheter",
+      "instruction": "Don sterile gloves. Remove dressing. Withdraw catheter smoothly in one continuous motion while patient exhales or performs Valsalva."
+    },
+    {
+      "id": 4,
+      "title": "Apply Pressure",
+      "instruction": "Apply firm direct pressure to the site for a minimum of 2 minutes or until bleeding stops."
+    },
+    {
+      "id": 5,
+      "title": "Dress Site",
+      "instruction": "Apply sterile occlusive dressing to the site. Instruct patient to remain flat for 30 minutes."
+    },
+    {
+      "id": 6,
+      "title": "Line Removed Confirmation",
+      "instruction": "Inspect removed catheter to confirm it is intact. Measure and document catheter length. Send tip for culture if infection suspected."
+    },
+    {
+      "id": 7,
+      "title": "Procedure Complete",
+      "instruction": "Document removal date, time, catheter condition, and clinician. Monitor site for 24 hours for signs of complications."
+    }
+  ]
+}
