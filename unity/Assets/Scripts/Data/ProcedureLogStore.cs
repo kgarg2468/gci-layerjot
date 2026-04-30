@@ -8,6 +8,7 @@ namespace CLABSIApp
     public static class ProcedureLogStore
     {
         private static List<ProcedureLogEntry> cache;
+        private static readonly List<AiEvent> pendingAiEvents = new List<AiEvent>();
 
         private static string FilePath => Path.Combine(Application.persistentDataPath, "procedure_log.json");
 
@@ -36,6 +37,34 @@ namespace CLABSIApp
             if (entry == null) return;
             LoadAll();
             cache.Add(entry);
+            Save();
+        }
+
+        public static void RecordAiEvent(AiEvent entry)
+        {
+            if (entry == null) return;
+            pendingAiEvents.Add(entry);
+        }
+
+        public static AiEvent[] DrainPendingAiEvents()
+        {
+            AiEvent[] events = pendingAiEvents.ToArray();
+            pendingAiEvents.Clear();
+            return events;
+        }
+
+        public static void ApplyLatestAiSummary(AiActionParameters parameters, string summary)
+        {
+            LoadAll();
+            if (cache.Count == 0) return;
+
+            ProcedureLogEntry latest = cache[cache.Count - 1];
+            latest.aiSummary = summary;
+            if (parameters != null)
+            {
+                latest.complianceScore = parameters.compliance_score;
+                latest.missedStepIds = parameters.missed_step_ids;
+            }
             Save();
         }
 

@@ -16,6 +16,44 @@ namespace CLABSIApp
 
         private ProcedureData currentProcedure;
         private int currentStepIndex;
+        private string startedAtIso;
+        private string pendingAiSummary;
+        private int pendingComplianceScore;
+        private int[] pendingMissedStepIds = Array.Empty<int>();
+
+        public bool HasActiveProcedure => currentProcedure != null;
+        public string CurrentProcedureId => currentProcedure != null ? currentProcedure.id : null;
+        public string CurrentProcedureName => currentProcedure != null ? currentProcedure.name : null;
+        public int CurrentStepIndex => currentProcedure != null ? currentStepIndex : -1;
+        public int TotalSteps => currentProcedure != null && currentProcedure.steps != null ? currentProcedure.steps.Length : 0;
+        public string StartedAtIso => startedAtIso;
+        public int CurrentStepId
+        {
+            get
+            {
+                StepData step = CurrentStep();
+                return step != null ? step.id : -1;
+            }
+        }
+        public string CurrentStepTitle
+        {
+            get
+            {
+                StepData step = CurrentStep();
+                return step != null ? step.title : null;
+            }
+        }
+        public int[] CompletedStepIds
+        {
+            get
+            {
+                if (currentProcedure == null || currentProcedure.steps == null) return Array.Empty<int>();
+                int count = Mathf.Clamp(currentStepIndex, 0, currentProcedure.steps.Length);
+                int[] completed = new int[count];
+                for (int i = 0; i < count; i++) completed[i] = currentProcedure.steps[i].id;
+                return completed;
+            }
+        }
 
         private void Awake()
         {
@@ -40,11 +78,37 @@ namespace CLABSIApp
             }
             currentProcedure = data;
             currentStepIndex = 0;
+            startedAtIso = DateTime.UtcNow.ToString("o");
+            pendingAiSummary = null;
+            pendingComplianceScore = 0;
+            pendingMissedStepIds = Array.Empty<int>();
             ScreenManager.Instance?.Show("StepChecklistScreen");
             Render();
         }
 
         public void Advance() => OnNext();
+
+        public void MovePrevious()
+        {
+            if (currentProcedure == null || currentStepIndex <= 0) return;
+            currentStepIndex--;
+            Render();
+        }
+
+        public void ReadCurrentStep()
+        {
+            StepData step = CurrentStep();
+            if (step == null) return;
+            TtsService.Instance?.Speak($"{step.title}. {step.instruction}");
+        }
+
+        public void ApplyAiSummary(AiActionParameters parameters, string spokenSummary)
+        {
+            pendingAiSummary = spokenSummary;
+            if (parameters == null) return;
+            pendingComplianceScore = parameters.compliance_score;
+            pendingMissedStepIds = parameters.missed_step_ids ?? Array.Empty<int>();
+        }
 
         private void OnNext()
         {
@@ -52,14 +116,22 @@ namespace CLABSIApp
             if (currentStepIndex >= currentProcedure.steps.Length - 1)
             {
                 Debug.Log($"[StepChecklist] Procedure complete: {currentProcedure.id}");
-                ProcedureLogStore.Add(new ProcedureLogEntry
+                ProcedureLogEntry entry = new ProcedureLogEntry
                 {
                     procedureId = currentProcedure.id,
                     procedureName = currentProcedure.name,
+                    startedAtIso = startedAtIso,
                     completedAtIso = DateTime.UtcNow.ToString("o"),
                     stepsCompleted = currentProcedure.steps.Length,
-                    totalSteps = currentProcedure.steps.Length
-                });
+                    totalSteps = currentProcedure.steps.Length,
+                    completedStepIds = AllStepIds(),
+                    missedStepIds = pendingMissedStepIds,
+                    complianceScore = pendingComplianceScore,
+                    aiSummary = pendingAiSummary,
+                    aiEvents = ProcedureLogStore.DrainPendingAiEvents()
+                };
+                ProcedureLogStore.Add(entry);
+                AiWebSocketClient.Instance?.SendProcedureComplete(entry);
                 TtsService.Instance?.Stop();
                 currentProcedure = null;
                 ScreenManager.Instance?.Show("ProceduresPage");
@@ -91,6 +163,21 @@ namespace CLABSIApp
             if (nextButtonLabel != null) nextButtonLabel.text = isLast ? "Done" : "Next";
 
             TtsService.Instance?.Speak($"{step.title}. {step.instruction}");
+        }
+
+        private StepData CurrentStep()
+        {
+            if (currentProcedure == null || currentProcedure.steps == null) return null;
+            if (currentStepIndex < 0 || currentStepIndex >= currentProcedure.steps.Length) return null;
+            return currentProcedure.steps[currentStepIndex];
+        }
+
+        private int[] AllStepIds()
+        {
+            if (currentProcedure == null || currentProcedure.steps == null) return Array.Empty<int>();
+            int[] ids = new int[currentProcedure.steps.Length];
+            for (int i = 0; i < currentProcedure.steps.Length; i++) ids[i] = currentProcedure.steps[i].id;
+            return ids;
         }
     }
 }

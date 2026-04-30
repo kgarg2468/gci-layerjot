@@ -68,7 +68,10 @@ namespace CLABSIApp
             {
                 when = e.completedAtIso;
             }
-            return $"{e.procedureName}\n{when}  ·  {e.stepsCompleted}/{e.totalSteps} steps";
+            int aiEventCount = e.aiEvents != null ? e.aiEvents.Length : 0;
+            string score = e.complianceScore > 0 ? $"  ·  {e.complianceScore}% compliance" : string.Empty;
+            string ai = aiEventCount > 0 ? $"  ·  {aiEventCount} AI events" : string.Empty;
+            return $"{e.procedureName}\n{when}  ·  {e.stepsCompleted}/{e.totalSteps} steps{score}{ai}";
         }
 
         private void OnBack()
