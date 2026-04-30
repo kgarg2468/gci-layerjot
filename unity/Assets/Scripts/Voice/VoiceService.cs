@@ -61,7 +61,15 @@ namespace CLABSIApp
                 string heard = pendingResult;
                 pendingResult = null;
                 Debug.Log($"[Voice] Heard: '{heard}'");
-                VoiceCommandRouter.Dispatch(VoiceCommandRouter.Parse(heard));
+                VoiceCommand parsed = VoiceCommandRouter.Parse(heard);
+                if (parsed == VoiceCommand.Unknown)
+                {
+                    AiWebSocketClient.Instance?.SubmitTranscript(heard);
+                }
+                else
+                {
+                    VoiceCommandRouter.Dispatch(parsed);
+                }
             }
             if (pendingErrorCode != int.MinValue)
             {

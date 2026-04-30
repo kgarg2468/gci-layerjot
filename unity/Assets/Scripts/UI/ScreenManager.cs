@@ -5,6 +5,7 @@ namespace CLABSIApp
     public class ScreenManager : MonoBehaviour
     {
         public static ScreenManager Instance { get; private set; }
+        public string CurrentScreenName { get; private set; } = "unknown";
 
         private void Awake()
         {
@@ -28,6 +29,7 @@ namespace CLABSIApp
             {
                 child.gameObject.SetActive(child == target);
             }
+            CurrentScreenName = screenName;
         }
     }
 }
