@@ -1,0 +1,22 @@
+{
+  "responses": [
+    {
+      "key": "unsafe_clinical_request",
+      "action_cmd": "show_alert",
+      "severity": "warning",
+      "spoken_response": "I cannot provide diagnosis or medication dosing guidance. Please consult the attending physician."
+    },
+    {
+      "key": "hand_hygiene",
+      "action_cmd": "show_alert",
+      "severity": "warning",
+      "spoken_response": "Please confirm hand hygiene and sterile technique before continuing."
+    },
+    {
+      "key": "backend_offline",
+      "action_cmd": "read_step",
+      "severity": "info",
+      "spoken_response": "The AI backend is offline. Continue using the local checklist and verify clinical decisions with the care team."
+    }
+  ]
+}
