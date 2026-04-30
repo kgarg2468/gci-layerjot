@@ -15,6 +15,16 @@ IntentType = Literal[
     "error",
 ]
 
+ActionCommand = Literal[
+    "next_step",
+    "prev_step",
+    "show_alert",
+    "read_step",
+    "flag_breach",
+    "end_procedure",
+    "navigate_home",
+]
+
 
 class ContextPayload(BaseModel):
     patient_id: Optional[str] = None
@@ -22,6 +32,14 @@ class ContextPayload(BaseModel):
     current_step: Optional[int] = None
     procedure_active: bool = False
     session_id: str
+    procedure_id: Optional[str] = None
+    procedure_name: Optional[str] = None
+    current_step_id: Optional[int] = None
+    current_step_title: Optional[str] = None
+    total_steps: Optional[int] = None
+    completed_step_ids: List[int] = Field(default_factory=list)
+    missed_step_ids: List[int] = Field(default_factory=list)
+    started_at: Optional[str] = None
 
 
 class AIRequestPayload(BaseModel):
@@ -45,6 +63,7 @@ class DebugPayload(BaseModel):
     tool_called: Optional[str] = None
     tool_calls: List[str] = Field(default_factory=list)
     tool_inputs: List[Dict[str, Any]] = Field(default_factory=list)
+    sources: List[str] = Field(default_factory=list)
     latency_ms: Optional[int] = None
 
 
@@ -55,11 +74,21 @@ class AIResponsePayload(BaseModel):
     debug: Optional[DebugPayload] = None
 
 
+class GuideActionPayload(BaseModel):
+    action_cmd: ActionCommand
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    spoken_response: str
+
+
 class AIResponseEnvelope(BaseModel):
     type: Literal["ai_response"]
     session_id: str
     timestamp: str
     payload: AIResponsePayload
+    schema_version: str = "clabsi-ar.v1"
+    action_cmd: Optional[ActionCommand] = None
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    spoken_response: str = ""
 
 
 class BasicEnvelope(BaseModel):
