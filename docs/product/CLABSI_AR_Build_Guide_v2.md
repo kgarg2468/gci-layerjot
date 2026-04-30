@@ -4,7 +4,7 @@
 
 **Institution:** Chapman University · Grand Challenges Initiative  
 **Partner:** LayerJot (Mentors: Soren Harner, Etay Gafni)  
-**Team:** AB Owusu-Agyemang · Arthur Shurtleff · Jack Baker · Krish Garg · Noelle Tulabing · Zaara Batla
+**Team:** AB Owusu-Agyemang · Arthur Shurtleff · Jack Baker · Krish Garg · Zaara Batla
 
 ---
 

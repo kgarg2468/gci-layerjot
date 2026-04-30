@@ -9,6 +9,7 @@ namespace CLABSIApp
             if (string.IsNullOrWhiteSpace(text)) return VoiceCommand.Unknown;
             string t = text.Trim().ToLowerInvariant();
 
+            if (t.Contains("back") || t.Contains("return") || t.Contains("cancel")) return VoiceCommand.Back;
             if (t.Contains("log")) return VoiceCommand.Log;
             if (t.Contains("setting")) return VoiceCommand.Settings;
             if (t.Contains("insert")) return VoiceCommand.Insert;
@@ -54,6 +55,15 @@ namespace CLABSIApp
                     break;
                 case VoiceCommand.Remove:
                     StartProcedure("remove");
+                    break;
+                case VoiceCommand.Back:
+                    {
+                        StepChecklistController active = Object.FindAnyObjectByType<StepChecklistController>(FindObjectsInactive.Exclude);
+                        if (active != null && active.gameObject.activeInHierarchy)
+                            ScreenManager.Instance?.Show("ProceduresPage");
+                        else
+                            ScreenManager.Instance?.Show("HomeScreen");
+                    }
                     break;
                 case VoiceCommand.Unknown:
                     Debug.Log("[Voice] Unknown command — ignored");
