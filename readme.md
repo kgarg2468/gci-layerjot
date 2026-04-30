@@ -6,6 +6,8 @@ This repository now includes a Mac-only two-process MVP:
 
 Product references for coding agents live in [`docs/`](docs/), including the CLABSI AR glasses use cases, implementation checklist, and full AR build guide.
 
+The shared Unity/backend AI contract is documented in [`docs/product/ai-action-contract.md`](docs/product/ai-action-contract.md).
+
 ## 1) Setup
 
 ```bash
@@ -54,3 +56,5 @@ Or separate terminals:
 2. `open central line checklist` -> `navigate` + `open_screen`
 3. `what sterile precautions are required before insertion` -> `rag`
 4. Diagnosis or dosing prompts -> `safety_block`
+
+Guide-compatible websocket responses also include top-level `schema_version`, `action_cmd`, `parameters`, and `spoken_response` fields for Unity/XREAL clients.
