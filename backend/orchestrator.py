@@ -319,6 +319,18 @@ def _enforce_output_guards(
     return candidate
 
 
+def _source_names(tool_results: List[Dict[str, Any]]) -> List[str]:
+    sources: list[str] = []
+    for item in tool_results:
+        result = item.get("result")
+        if not isinstance(result, dict):
+            continue
+        for doc in result.get("results", []) or []:
+            if isinstance(doc, dict) and doc.get("source"):
+                sources.append(str(doc["source"]))
+    return sorted(set(sources))
+
+
 async def run_agent(transcript: str, context: dict) -> AIResponsePayload:
     violation = safety_check(transcript, context)
     if violation:
@@ -347,6 +359,7 @@ async def run_agent(transcript: str, context: dict) -> AIResponsePayload:
             tool_called=tool_results[0]["name"] if tool_results else None,
             tool_calls=[item["name"] for item in tool_results],
             tool_inputs=[item["args"] for item in tool_results],
+            sources=_source_names(tool_results),
         )
         return payload
 
