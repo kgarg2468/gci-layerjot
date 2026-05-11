@@ -8,9 +8,14 @@
 [Uu]ser[Ss]ettings/
 [Mm]emoryCaptures/
 [Rr]ecordings/
+[Aa]ssets/_[Rr]ecovery/
+[Aa]ssets/_[Rr]ecovery.meta
 
 # Asset meta files: keep meta only when the asset is also tracked
 !/[Aa]ssets/**/*.meta
+
+# Re-ignore meta files for the recovery folder (negation above would otherwise un-ignore them)
+[Aa]ssets/_[Rr]ecovery.meta
 
 # IDE / editor
 .vs/

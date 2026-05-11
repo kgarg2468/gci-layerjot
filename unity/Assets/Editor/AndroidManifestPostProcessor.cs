@@ -27,10 +27,16 @@ namespace CLABSIApp.EditorTools
 
             bool changed = false;
 
-            if (!HasPermission(manifest, "android.permission.RECORD_AUDIO"))
+            string[] requiredPermissions =
             {
+                "android.permission.RECORD_AUDIO",
+                "android.permission.CAMERA",
+            };
+            foreach (var permName in requiredPermissions)
+            {
+                if (HasPermission(manifest, permName)) continue;
                 XmlElement perm = doc.CreateElement("uses-permission");
-                perm.SetAttribute("name", AndroidNs, "android.permission.RECORD_AUDIO");
+                perm.SetAttribute("name", AndroidNs, permName);
                 manifest.InsertBefore(perm, manifest.FirstChild);
                 changed = true;
             }
@@ -56,7 +62,7 @@ namespace CLABSIApp.EditorTools
             if (changed)
             {
                 doc.Save(manifestPath);
-                Debug.Log("[ManifestPostProcessor] Injected RECORD_AUDIO permission and SpeechRecognizer query");
+                Debug.Log("[ManifestPostProcessor] Injected RECORD_AUDIO + CAMERA permissions and SpeechRecognizer query");
             }
         }
 

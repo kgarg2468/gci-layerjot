@@ -10,12 +10,40 @@ namespace CLABSIApp
     {
         public static VoiceService Instance { get; private set; }
 
+        public bool IsListening
+        {
+            get
+            {
+#if UNITY_ANDROID && !UNITY_EDITOR
+                return isListening;
+#else
+                return true;
+#endif
+            }
+        }
+
+        // Phase 2 stub for hands-free operation: auto-restart listening so the user
+        // doesn't need to tap a Mic button to issue commands. Phase 4 will replace
+        // this with proper Porcupine wake-word gating.
+#pragma warning disable CS0414
+        [SerializeField] private bool continuousListening = true;
+        [SerializeField] private float restartDelaySeconds = 0.4f;
+#pragma warning restore CS0414
+
 #if UNITY_ANDROID && !UNITY_EDITOR
         private AndroidJavaObject recognizer;
         private AndroidJavaObject mainActivity;
+        private AndroidJavaObject audioManager;
         private bool isListening;
         private volatile string pendingResult;
         private volatile int pendingErrorCode = int.MinValue;
+        private volatile bool pendingRestart;
+        private int originalNotificationVolume = -1;
+        private int originalSystemVolume = -1;
+
+        // android.media.AudioManager stream constants
+        private const int STREAM_SYSTEM = 1;
+        private const int STREAM_NOTIFICATION = 5;
 #endif
 
         private void Awake()
@@ -37,8 +65,46 @@ namespace CLABSIApp
             {
                 Debug.LogError($"[Voice] Failed to grab Android activity: {ex.Message}");
             }
+
+            if (continuousListening) MuteRecognizerBeeps();
 #endif
         }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        private void MuteRecognizerBeeps()
+        {
+            if (mainActivity == null) return;
+            try
+            {
+                AndroidJavaObject ctx = mainActivity.Call<AndroidJavaObject>("getApplicationContext");
+                audioManager = ctx.Call<AndroidJavaObject>("getSystemService", "audio");
+                if (audioManager == null) return;
+
+                originalNotificationVolume = audioManager.Call<int>("getStreamVolume", STREAM_NOTIFICATION);
+                originalSystemVolume = audioManager.Call<int>("getStreamVolume", STREAM_SYSTEM);
+                audioManager.Call("setStreamVolume", STREAM_NOTIFICATION, 0, 0);
+                audioManager.Call("setStreamVolume", STREAM_SYSTEM, 0, 0);
+                Debug.Log("[Voice] Muted notification + system streams to suppress recognizer beeps");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[Voice] Could not mute beep streams: {ex.Message}");
+            }
+        }
+
+        private void RestoreRecognizerBeeps()
+        {
+            if (audioManager == null) return;
+            try
+            {
+                if (originalNotificationVolume >= 0)
+                    audioManager.Call("setStreamVolume", STREAM_NOTIFICATION, originalNotificationVolume, 0);
+                if (originalSystemVolume >= 0)
+                    audioManager.Call("setStreamVolume", STREAM_SYSTEM, originalSystemVolume, 0);
+            }
+            catch { }
+        }
+#endif
 
         private void Update()
         {
@@ -77,8 +143,20 @@ namespace CLABSIApp
                 pendingErrorCode = int.MinValue;
                 Debug.LogWarning($"[Voice] Recognition error code {code}");
             }
+            if (pendingRestart && continuousListening)
+            {
+                pendingRestart = false;
+                Invoke(nameof(StartListening), restartDelaySeconds);
+            }
 #endif
         }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        private void Start()
+        {
+            if (continuousListening) StartListening();
+        }
+#endif
 
         public void StartListening()
         {
@@ -137,6 +215,8 @@ namespace CLABSIApp
 
         private void OnDestroy()
         {
+            RestoreRecognizerBeeps();
+
             if (recognizer == null || mainActivity == null) return;
             AndroidJavaObject toDestroy = recognizer;
             recognizer = null;
@@ -160,7 +240,7 @@ namespace CLABSIApp
             [UnityEngine.Scripting.Preserve] public void onRmsChanged(float r) { }
             [UnityEngine.Scripting.Preserve] public void onBufferReceived(AndroidJavaObject b) { }
             [UnityEngine.Scripting.Preserve] public void onEndOfSpeech() { }
-            [UnityEngine.Scripting.Preserve] public void onError(int e) { owner.isListening = false; owner.pendingErrorCode = e; }
+            [UnityEngine.Scripting.Preserve] public void onError(int e) { owner.isListening = false; owner.pendingErrorCode = e; owner.pendingRestart = true; }
             [UnityEngine.Scripting.Preserve] public void onPartialResults(AndroidJavaObject p) { }
             [UnityEngine.Scripting.Preserve] public void onEvent(int e, AndroidJavaObject p) { }
 
@@ -168,6 +248,7 @@ namespace CLABSIApp
             public void onResults(AndroidJavaObject results)
             {
                 owner.isListening = false;
+                owner.pendingRestart = true;
                 try
                 {
                     AndroidJavaObject list = results.Call<AndroidJavaObject>("getStringArrayList", "results_recognition");

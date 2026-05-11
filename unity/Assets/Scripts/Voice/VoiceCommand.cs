@@ -11,6 +11,7 @@ namespace CLABSIApp
         Settings,
         Insert,
         Maintenance,
-        Remove
+        Remove,
+        Back
     }
 }
