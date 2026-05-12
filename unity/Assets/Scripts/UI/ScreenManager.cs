@@ -27,9 +27,16 @@ namespace CLABSIApp
             }
             foreach (Transform child in transform)
             {
+                if (IsPersistent(child)) continue;
                 child.gameObject.SetActive(child == target);
             }
             CurrentScreenName = screenName;
+        }
+
+        private static bool IsPersistent(Transform child)
+        {
+            string n = child.name;
+            return n.StartsWith("Ai") || n == "AlertOverlay";
         }
     }
 }

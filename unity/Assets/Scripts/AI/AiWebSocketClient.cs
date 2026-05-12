@@ -131,6 +131,23 @@ namespace CLABSIApp
             await SendJson(JsonUtility.ToJson(envelope));
         }
 
+        public async void Reconnect()
+        {
+            try
+            {
+                cancellation?.Cancel();
+                if (socket != null)
+                {
+                    try { await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "reconnect", CancellationToken.None); } catch { }
+                    socket.Dispose();
+                    socket = null;
+                }
+            }
+            catch { }
+            connecting = false;
+            await ConnectWithBackoff();
+        }
+
         private async Task ConnectWithBackoff()
         {
             if (IsConnected || connecting) return;
@@ -145,7 +162,8 @@ namespace CLABSIApp
                 {
                     socket?.Dispose();
                     socket = new ClientWebSocket();
-                    await socket.ConnectAsync(new Uri(backendUrl), cancellation.Token);
+                    string url = SettingsStore.BuildBackendUrl(backendUrl);
+                    await socket.ConnectAsync(new Uri(url), cancellation.Token);
                     _ = ReceiveLoop();
                     Debug.Log("[AI WS] Connected");
                     connecting = false;
